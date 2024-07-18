@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Sequence
 
 import sqlalchemy
-from sqlalchemy import select
+from sqlalchemy import select, DateTime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from config import DATABASE
@@ -29,11 +29,12 @@ class Database:
             # await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
 
-    async def add_user(self, user_id: int, available_generations: int = 2) -> None:
+    async def add_user(self, user_id: int, name, username) -> None:
         """
         Добавляет пользователя в БД с определенным количеством генераций
         :param user_id: ID пользователя
-        :param available_generations: Доступные генерации
+        :param name: Имя пользователя
+        :param username: Никнейм пользователя
         :return: None
         """
 
@@ -41,7 +42,8 @@ class Database:
             async with self.__async_session_factory() as session:
                 user = UsersORM(
                     id=user_id,
-                    available_generations=available_generations,
+                    name=name,
+                    username=username,
                     used_generations=0
                 )
                 session.add(user)
@@ -76,71 +78,77 @@ class Database:
         :param user_id: ID пользователя
         :return: Словарь с данными пользователя по ключам согласно таблице БД.
         - id
-        - available_generations
+        - name
+        - username
+        - subscription_end_date
         - used_generations
         - datetime_registration
+        - subscription_end_date
         """
         try:
             async with self.__async_session_factory() as session:
                 user_data = await session.get(UsersORM, user_id)
                 return {
                     'id': user_data.id,
-                    'available_generations': user_data.available_generations,
+                    'name': user_data.name,
+                    'username': user_data.username,
+                    'subscription_end_date': user_data.subscription_end_date,
                     'used_generations': user_data.used_generations,
                     'datetime_registration': user_data.datetime_registration,
+                    'daily_generation': user_data.daily_generation,
                 }
         except AttributeError:
             logging.error("Пользователя не существует в базе данных")
             return {}
 
-    async def add_available_generations(self, user_id: int, num: int) -> None:
+    async def subscribe_user(self, user_id: int, subscription_end_date: DateTime) -> None:
         """
-        Добавляет заданное количество генераций изображений
+        Добавляет дату окончания подписки пользователю
 
+        :param subscription_end_date: до какого числа/времени действует подписка
         :param user_id: ID пользователя
-        :param num: Количество генераций
         :return: None
         """
         try:
             async with self.__async_session_factory() as session:
                 user_data = await session.get(UsersORM, user_id)
-                user_data.available_generations += num
+                if user_data:
+                    user_data.subscription_end_date = subscription_end_date
+
                 await session.commit()
         except AttributeError:
             logging.error("Пользователя не существует в базе данных")
 
-    async def remove_available_generation(self, user_id: int) -> None:
-        """
-        Удаляет 1 генерацию изображения из доступных (available_generations)
-        и добавляет 1 в использованные (used_generations)
 
+    async def add_used_and_daily_generation(self, user_id: int) -> None:
+        """
+        Добавляет 1 генерацию в использованные (used_generations)
         :param user_id: ID пользователя
         :return: None
         """
         try:
             async with self.__async_session_factory() as session:
                 user_data = await session.get(UsersORM, user_id)
-                user_data.available_generations -= 1
                 user_data.used_generations += 1
+                user_data.daily_generation += 1
                 await session.commit()
         except AttributeError:
             logging.error("Пользователя не существует в базе данных")
 
-    async def add_payment(self, user_id: int, total_amount: int, generations: int) -> None:
+    async def add_payment(self, user_id: int, purchase_amount: int, subscription_end_date: DateTime) -> None:
         """
         Добавляет платеж в БД
+        :param subscription_end_date:
         :param user_id: ID пользователя
-        :param total_amount: Сумма платежа
-        :param generations: Кол-во генераций
+        :param purchase_amount: Сумма платежа
         :return: None
         """
-
         try:
             async with self.__async_session_factory() as session:
                 payment = PaymentsORM(
                     user_id=user_id,
-                    total_amount=total_amount,
-                    generations=generations,
+                    purchase_amount=purchase_amount,
+                    subscription_end_date=subscription_end_date,
                 )
                 session.add(payment)
                 await session.commit()
@@ -161,7 +169,41 @@ class Database:
             payments = result.scalars().all()
             return payments
 
+    async def reset_daily_limit_for_all_users(self) -> None:
+        """
+        Функция для сброса лимита
+        """
+        try:
+            async with (self.__async_session_factory() as session):
+                query = select(UsersORM).order_by(UsersORM.id)
+                result = await session.execute(query)
+                users = result.scalars().all()
+                for user in users:
+                    user.daily_generation = 0
+                await session.commit()
+        except sqlalchemy.exc.OperationalError:
+            logging.error('Базы Данных или таблицы не существует')
+        return
+
+
+    async def get_user_list(self) -> Sequence[UsersORM]:
+        """
+        Список пользователей
+        """
+
+        try:
+            async with (self.__async_session_factory() as session):
+                query = select(UsersORM).order_by(UsersORM.id)
+                result = await session.execute(query)
+                users = result.scalars().all()
+                return users
+        except sqlalchemy.exc.OperationalError:
+            logging.error('Базы Данных или таблицы не существует')
+            return []
+
 
 db = Database()
 
 
+if __name__ == "__main__":
+    print(asyncio.run(db.get_user_list()))

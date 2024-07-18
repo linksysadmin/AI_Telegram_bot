@@ -1,11 +1,18 @@
+import os.path
+
 from aiogram import Router, html
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, InputMediaPhoto, FSInputFile
+from aiogram.utils.media_group import MediaGroupBuilder
 
 from app import keyboards as kb
 from app.database.requests import db
-from app.templates.messages_templates import MESSAGE_HELP
+from app.filters.user_filters import Admins
+from app.image_generate import get_api_subscription_tokens
+from app.templates.messages_templates import MESSAGE_HELP, TEXT_FOR_PROFILE, MESSAGE_START_FOR_NEW_USERS, MESSAGE_START, \
+    TEXT_FOR_ADMINS_PROFILE
+from config import MEDIA_DIR
 
 router = Router(name=__name__)
 
@@ -19,14 +26,24 @@ async def command_start_handler(message: Message, state: FSMContext) -> None:
     :param state: Состояние
     """
     user_id = message.from_user.id
-    check_user = await db.get_user_data(user_id=user_id)
-    if not check_user:
-        await db.add_user(user_id=user_id)
+
+    user_data = await db.get_user_data(user_id=user_id)
+    # used_generations = user_data.get('used_generations')
+
+    if not user_data:
+        name = message.from_user.first_name
+        username = message.from_user.username
+        await db.add_user(user_id=user_id, name=name, username=username)
+        mess = 'Вам доступно 3 генерации\n' \
+               '/buy - покупка генераций'
+        media_group = MediaGroupBuilder(
+            caption=MESSAGE_START_FOR_NEW_USERS.format(name=html.bold(message.from_user.full_name)) + mess)
+        media_group.add(type='photo', media=FSInputFile(f'{MEDIA_DIR}/original.jpg'))
+        media_group.add(type='photo', media=FSInputFile(f'{MEDIA_DIR}/result.jpg'))
+        await message.bot.send_media_group(user_id, media=media_group.build())
+    else:
+        await message.answer(MESSAGE_START, reply_markup=await kb.start_menu())
     await state.clear()
-    await message.answer(f"Здравствуйте!, {html.bold(message.from_user.full_name)}!\n"
-                         f"Вас приветствует бот генерации изображения 📸\n\n"
-                         + MESSAGE_HELP,
-                         reply_markup=await kb.start_menu())
 
 
 @router.message(Command('help'))
@@ -55,10 +72,31 @@ async def command_buy_handler(message: Message, state: FSMContext) -> None:
                          reply_markup=await kb.generations())
 
 
+@router.message(Command('account'), Admins())
+async def command_buy_handler(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    tokens = await get_api_subscription_tokens()
+    await message.answer(TEXT_FOR_ADMINS_PROFILE.format(name=message.from_user.first_name,
+                                                        user_id=message.from_user.id,
+                                                        tokens=tokens), reply_markup=await kb.personal_area())
+
+
+@router.message(Command('get_user_list'), Admins())
+async def command_buy_handler(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    users_sequence = await db.get_user_list()
+    users_list = []
+    for i, user in enumerate(users_sequence, start=1):
+        users_list.append(f'{i}. {user.name} - @{user.username}')
+
+    await message.answer('Список пользователей:\n'
+                         '№  |  Имя  |  username   \n\n' + '\n'.join(users_list), reply_markup=await kb.cancel())
+
+
 @router.message(Command('account'))
 async def command_buy_handler(message: Message, state: FSMContext) -> None:
     """
-    Метод для обработки команды '/profile'
+    Метод для обработки команды '/account'
     :param message: Сообщение-entity
     :param state: Состояние
     """
@@ -67,13 +105,13 @@ async def command_buy_handler(message: Message, state: FSMContext) -> None:
     user_id = message.from_user.id
     user_data = await db.get_user_data(user_id)
     if user_data:
-        await message.answer(f'Личный кабинет:\n\n'
-                             f'Имя: {message.from_user.first_name}\n'
-                             f'ID: {user_id}\n'
-                             f'Доступно генераций: {user_data["available_generations"]}\n'
-                             f'Использовано генераций: {user_data["used_generations"]}\n\n'
-                             f'Купить генерации: /buy\n'
-                             f'Нажмите /start для генерации изображения'
-                             )
+        if user_data['subscription_end_date']:
+            subscription_end_date = user_data['subscription_end_date'].strftime("%d.%m.%Y %H:%M")
+        else:
+            subscription_end_date = 'Не оформлена'
+        await message.answer(TEXT_FOR_PROFILE.format(name=message.from_user.first_name,
+                                                     user_id=user_id,
+                                                     subscription_end_date=subscription_end_date,
+                                                     used_generations=user_data['used_generations']))
     else:
         await message.answer(f'Нажмите /start для начала')

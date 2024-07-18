@@ -12,10 +12,11 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-
+from app.database.requests import db
 from config import TELEGRAM_TOKEN, BASE_WEBHOOK_URL, WEBHOOK_PATH, WEB_SERVER_HOST, WEB_SERVER_PORT, REDIS_URL, DEBUG
 from app.middleware.user_middleware import CheckUserInGroupMiddleware
 from app.routers import router as main_router
+from tasks import launching_the_daily_generation_reset_task
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -25,8 +26,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%m.%d.%Y',
 )
-
-
 
 storage = RedisStorage.from_url(REDIS_URL)
 dp = Dispatcher()
@@ -43,6 +42,8 @@ COMMANDS = [
     BotCommand(command='buy', description='Купить генерации'),
     BotCommand(command='account', description='Личный кабинет'),
 ]
+
+
 
 
 async def on_startup(bot: Bot) -> None:
@@ -80,6 +81,7 @@ def main() -> None:
 async def start_bot_testing_mode() -> None:
     try:
         await bot.set_my_commands(COMMANDS)
+        await launching_the_daily_generation_reset_task()
         await dp.start_polling(bot)
     finally:
         await bot.session.close()

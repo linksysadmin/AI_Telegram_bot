@@ -5,6 +5,7 @@ import aiohttp
 from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
+from aiogram.utils import markdown
 from aiogram.utils.chat_action import ChatActionSender
 
 from app.database.requests import db
@@ -23,11 +24,12 @@ async def get_image(message: Message, state: FSMContext) -> None:
     await message.bot.download(file=message.photo[-1].file_id, destination=image)
     await state.update_data(image=image)
     user_data = await state.get_data()
-    if user_data.get('type_gen') == 'animation':
+    if user_data.get('type_gen') == 'animation' or user_data.get('type_gen') == 'improve':
         await _generate_image(message, state)
         return
     else:
-        await message.answer(f"2️⃣ Шаг: Напишите запрос (prompt) для генерации изображения", reply_markup=await kb.cancel())
+        await message.answer(f"2️⃣ Шаг: Опишите подробно что вы хотите получить на картинке\n\n"
+                             f'Совет:\n{markdown.hblockquote("Подробно опишите то, что должно быть изображено.")}', reply_markup=await kb.cancel())
         await state.set_state(Generation.prompt)
 
 
@@ -51,6 +53,8 @@ async def incorrect_prompt(message: Message) -> None:
 
 async def _generate_image(message: Message, state: FSMContext):
     await message.answer_dice(emoji='🎲')
+    await message.answer('Запрос принят! Начинаю творить!\n'
+                         'Подождите немного, это займет некоторое время!')
 
     user_data = await state.get_data()
     image_file = user_data.get('image')
@@ -68,6 +72,8 @@ async def _generate_image(message: Message, state: FSMContext):
                     url = await image_generate.generate_image_by_text_prompt(prompt=prompt)
                 case 'image_and_request':
                     url = await image_generate.generate_image_by_image(image_file, extension='jpg', prompt=prompt)
+                case 'improve':
+                    url = await image_generate.universal_upscaler_image(image_file, extension='jpg')
                 case 'animation':
                     url = await image_generate.generate_motion_by_image(image_file=image_file, extension='jpg')
                     extension = 'mp4'
@@ -82,9 +88,14 @@ async def _generate_image(message: Message, state: FSMContext):
                     )
                 )
                 logger.info("Удачная отправка файла пользователю")
-                await db.remove_available_generation(message.from_user.id)
     except Exception as e:
         logger.error(f"Ошибка при отправке генерации: {e}")
         await message.answer(
-            text=f'К сожалению боту не удалось сгенерировать ваш запрос.'
-                 f'', reply_markup=await kb.cancel())
+            text=f'К сожалению боту не удалось сгенерировать ваш запрос.', reply_markup=await kb.cancel())
+    try:
+        await db.add_used_generation(message.from_user.id)
+    except Exception as e:
+        logger.error(f"Ошибка при запросе в базу данных: {e}")
+
+
+

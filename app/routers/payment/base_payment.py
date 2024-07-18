@@ -1,10 +1,13 @@
+import datetime
 import json
+from datetime import timedelta
 
 from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice
-from aiogram import types, Router, F
+from aiogram import types, Router, F, html
 
 from app.database.requests import db
+from app.templates.messages_templates import TEXT_FOR_PROFILE
 from config import PAYMENT_TOKEN
 
 router = Router()
@@ -67,15 +70,22 @@ async def successful_payment(message: types.Message,
     """
     Метод при успешном платеже.
     Получает основную информацию об успешном платеже и сохраняет запись в базе данных
-     + удаляет 1 использованную генерацию из доступных (available_generations)
     """
     user_id = message.from_user.id
-    total_amount = message.successful_payment.total_amount // 100
-    user_data = await state.get_data()
-    gen_amount = user_data['gen_amount']
+    purchase_amount = message.successful_payment.total_amount // 100
+    user_data_cache = await state.get_data()
+    user_data = await db.get_user_data(message.from_user.id)
 
-    await db.add_available_generations(user_id, gen_amount)
-    await db.add_payment(user_id, total_amount, generations=gen_amount)
+    subscription_end_date_actual = user_data['subscription_end_date']
+    if subscription_end_date_actual:
+        subscription_end_date = subscription_end_date_actual + timedelta(days=user_data_cache['days'])
+    else:
+        subscription_end_date = datetime.datetime.now() + timedelta(days=user_data_cache['days'])
 
+    await db.subscribe_user(user_id, subscription_end_date)
+    await db.add_payment(user_id, purchase_amount, subscription_end_date)
     await message.bot.send_message(message.chat.id,
-                                   f"Платёж на сумму {total_amount} {message.successful_payment.currency} прошел успешно!")
+                                   f"✅ {html.bold('Оформлена подписка до:')}\n"
+                                   f"{html.pre(subscription_end_date.strftime('%d.%m.%Y %H:%M'))}\n"
+                                   f"/start - начать\n"
+                                   f"Успешной генерации 📸🎉!")

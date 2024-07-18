@@ -8,8 +8,8 @@ from config import TELEGRAM_CHANEL_URL
 
 
 
-class GenerationAmountCallbackData(CallbackData, prefix="gen_amount"):
-    gen_amount: int
+class DaysPriceCallbackData(CallbackData, prefix="days"):
+    days: int
     price: float
 
 
@@ -27,17 +27,27 @@ PRICE_FOR_GENERATIONS = {
 
 async def start_menu():
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Генерация', callback_data='generation'))
+    keyboard.add(InlineKeyboardButton(text='Начать', callback_data='generation'))
     keyboard.add(InlineKeyboardButton(text='Личный кабинет', callback_data='account'))
+    keyboard.adjust(1)
+    return keyboard.as_markup()
+
+
+async def personal_area():
+    keyboard = InlineKeyboardBuilder()
+    # keyboard.add(InlineKeyboardButton(text='Начать', callback_data='generation'))
+    # keyboard.add(InlineKeyboardButton(text='Оставшиеся токены', callback_data='tokens'))
+    keyboard.add(InlineKeyboardButton(text='Рассылка сообщения', callback_data='newsletter'))
     keyboard.adjust(1)
     return keyboard.as_markup()
 
 
 async def generations_menu():
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Генерация по запросу', callback_data=TypeGenerationCallbackData(type_gen='request').pack()))
-    keyboard.add(InlineKeyboardButton(text='Генерация по изображению и запросу', callback_data=TypeGenerationCallbackData(type_gen='image_and_request').pack()))
-    keyboard.add(InlineKeyboardButton(text='Генерация анимации', callback_data=TypeGenerationCallbackData(type_gen='animation').pack()))
+    keyboard.add(InlineKeyboardButton(text='🌠Создать картинку по запросу', callback_data=TypeGenerationCallbackData(type_gen='request').pack()))
+    keyboard.add(InlineKeyboardButton(text='👥Изменить своё фото', callback_data=TypeGenerationCallbackData(type_gen='image_and_request').pack()))
+    keyboard.add(InlineKeyboardButton(text='🧪Анимировать картинку', callback_data=TypeGenerationCallbackData(type_gen='animation').pack()))
+    keyboard.add(InlineKeyboardButton(text='🔮Улучшить качество фото', callback_data=TypeGenerationCallbackData(type_gen='improve').pack()))
     keyboard.add(InlineKeyboardButton(text='Назад', callback_data='cancel'))
     keyboard.adjust(1)
     return keyboard.as_markup()
@@ -45,6 +55,13 @@ async def generations_menu():
 
 async def cancel():
     keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Меню', callback_data='cancel'))
+    return keyboard.as_markup()
+
+
+async def send_newsletter():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Отправить', callback_data='send_newsletter'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data='cancel'))
     return keyboard.as_markup()
 
@@ -57,8 +74,8 @@ async def subscribe():
 
 async def generations():
     keyboard = InlineKeyboardBuilder()
-    for gen, price in PRICE_FOR_GENERATIONS.items():
-        keyboard.button(text=str(gen), callback_data=GenerationAmountCallbackData(gen_amount=gen, price=price).pack())
+    for days, price in PRICE_FOR_GENERATIONS.items():
+        keyboard.button(text=str(days), callback_data=DaysPriceCallbackData(days=days, price=price).pack())
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data='cancel'))
     keyboard.adjust(2)
     return keyboard.as_markup()

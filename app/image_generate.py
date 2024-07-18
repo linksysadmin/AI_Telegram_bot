@@ -6,8 +6,9 @@ import io
 import asyncio
 import logging
 import sys
-from typing import Dict
+from typing import Dict, Tuple
 
+import leonardoaisdk
 import requests
 import json
 
@@ -26,44 +27,10 @@ headers = {
     "authorization": authorization
 }
 
+s = leonardoaisdk.LeonardoAiSDK(
+    bearer_auth=LEONARDO_AI_TOKEN,
+)
 
-async def _generate_motion(payload: Dict) -> str:
-    """
-    Генерация видео
-    :param payload:
-    :return: Ссылка на видео
-    """
-    url = "https://cloud.leonardo.ai/api/rest/v1/generations-motion-svd"
-    response = requests.post(url, json=payload, headers=headers)
-    logger.info("Получение видео")
-    logger.info(response.json())
-    generation_id = response.json()['motionSvdGenerationJob']['generationId']
-    url = "https://cloud.leonardo.ai/api/rest/v1/generations/%s" % generation_id
-    await asyncio.sleep(60)
-    response = requests.get(url, headers=headers)
-    logger.info(f"Данные видео: {response.json()}")
-
-    image_url = response.json()['generations_by_pk']['generated_images'][0]['motionMP4URL']
-    return image_url
-
-
-async def _generate_image(payload: Dict) -> str:
-    """
-    :param payload: словарь с полезной нагрузкой
-    :return: URL изображения
-    """
-    url = "https://cloud.leonardo.ai/api/rest/v1/generations"
-
-    response = requests.post(url, json=payload, headers=headers)
-    logger.info("Статус генерации изображения: %s" % response.status_code)
-    generation_id = response.json()['sdGenerationJob']['generationId']
-    url = "https://cloud.leonardo.ai/api/rest/v1/generations/%s" % generation_id
-    await asyncio.sleep(20)
-    logger.info('Получение генерации изображения')
-    response = requests.get(url, headers=headers)
-    logger.info(f"Данные изображения: {response.json()}")
-    image_url = response.json()['generations_by_pk']['generated_images'][0]['url']
-    return image_url
 
 
 async def _upload_image(image_file: io.BytesIO, extension):
@@ -84,10 +51,99 @@ async def _upload_image(image_file: io.BytesIO, extension):
 
     # Чтобы получить изображение позже
     image_id = response.json()['uploadInitImage']['id']
+    logger.info(f"image_id: {image_id}")
     files = {'file': image_file}
     response = requests.post(url, data=fields, files=files)  # Header is not needed
     logger.info("Статус загрузки изображения по заранее указанному URL-адресу: %s" % response.status_code)
     return image_id
+
+
+async def _generate_motion(payload: Dict) -> str:
+    """
+    Генерация видео
+    :param payload:
+    :return: Ссылка на видео
+    """
+    url = "https://cloud.leonardo.ai/api/rest/v1/generations-motion-svd"
+    response = requests.post(url, json=payload, headers=headers)
+    logger.info("Получение видео")
+    logger.info(response.json())
+    generation_id = response.json()['motionSvdGenerationJob']['generationId']
+
+    url = "https://cloud.leonardo.ai/api/rest/v1/generations/%s" % generation_id
+    await asyncio.sleep(60)
+    response = requests.get(url, headers=headers)
+    logger.info(f"Данные видео: {response.json()}")
+
+    image_url = response.json()['generations_by_pk']['generated_images'][0]['motionMP4URL']
+    return image_url
+
+
+async def _generate_image(payload: Dict) -> Tuple:
+    """
+    :param payload: словарь с полезной нагрузкой
+    :return: URL изображения
+    """
+    url = "https://cloud.leonardo.ai/api/rest/v1/generations"
+
+    response = requests.post(url, json=payload, headers=headers)
+    logger.info("Статус генерации изображения: %s" % response.status_code)
+    generation_id = response.json()['sdGenerationJob']['generationId']
+    url = "https://cloud.leonardo.ai/api/rest/v1/generations/%s" % generation_id
+    await asyncio.sleep(40)
+    logger.info('Получение генерации изображения')
+    response = requests.get(url, headers=headers)
+    logger.info(f"Данные изображения: {response.json()}")
+    try:
+        image_url = response.json()['generations_by_pk']['generated_images'][0]['url']
+        image_id = response.json()['generations_by_pk']['generated_images'][0]['id']
+        return image_url, image_id
+    except Exception as e:
+        logger.error(f"Ошибка при получении сгенерированного изображения: {e}")
+        await asyncio.sleep(20)
+        logger.info(f"Вторая попытка получения изображения")
+        try:
+            response = requests.get(url, headers=headers)
+            image_url = response.json()['generations_by_pk']['generated_images'][0]['url']
+            image_id = response.json()['generations_by_pk']['generated_images'][0]['id']
+            logger.info(f"Данные изображения: {response.json()}")
+            return image_url, image_id
+        except Exception as e:
+            logger.error(f"Ошибка при получении сгенерированного изображения: {e}")
+
+
+
+
+
+async def generate_image_by_text_prompt(prompt: str):
+    """
+    Метод Leonardo: Generate Images Using Image Prompts
+    URL: https://docs.leonardo.ai/reference/creategeneration
+
+    # Leonardo Creative model:  b24e16ff-06e3-43eb-8d33-4416c2d75876
+    """
+    modelId = "aa77f04e-3eec-4034-9c07-d0f619684628"  # Leonardo Kino XL model
+
+    text = await text_translator(prompt)    # перевод текста
+    logger.info(f"Подсказка: {text}")
+    if not text:
+        return None
+
+    payload = {
+        "num_images": 1,
+        "height": 1024,
+        "width": 576,
+        "modelId": modelId,
+        "prompt": text,
+        "alchemy": True,
+        "photoReal": True,
+        "presetStyle": 'CINEMATIC',
+        "photoRealVersion": "v2",
+    }
+
+    image_url, image_id = await _generate_image(payload=payload)
+    s.image.delete_generation_by_id(id=image_id)
+    return image_url
 
 
 async def generate_image_by_image(image_file: io.BytesIO, extension: str, prompt: str) -> str | None:
@@ -98,8 +154,15 @@ async def generate_image_by_image(image_file: io.BytesIO, extension: str, prompt
     :param extension: расширение файла
     :param prompt: текстовая подсказка для изображения
     :return: URL изображения
+
+    Доступные модели:
+
+    - Standard: 1e60896f-3c26-4296-8ecc-53e2afecc132
+    - Leonardo Kino XL: aa77f04e-3eec-4034-9c07-d0f619684628
+    - Other: b24e16ff-06e3-43eb-8d33-4416c2d75876
     """
-    modelId = "1e60896f-3c26-4296-8ecc-53e2afecc132"
+    modelId = "aa77f04e-3eec-4034-9c07-d0f619684628"
+
 
     text = await text_translator(prompt)    # перевод текста
     logger.info(f"Подсказка: {text}")
@@ -109,47 +172,30 @@ async def generate_image_by_image(image_file: io.BytesIO, extension: str, prompt
     image_id = await _upload_image(image_file, extension)
 
     payload = {
-        "height": 512,
-        "modelId": modelId,  # Setting model ID to Leonardo Diffusion XL
-        "prompt": text,
-        "width": 512,
-        "init_image_id": image_id,  # Разрешено только одно изображение
-        "init_strength": 0.5,  # Должно быть между 0.1 and 0.9
         "num_images": 1,
-        # "presetStyle": 'CREATIVE',
-        # "photoRealVersion": "v1",
-    }
-
-    url_image = await _generate_image(payload=payload)
-    return url_image
-
-
-async def generate_image_by_text_prompt(prompt: str):
-    """
-    Метод Leonardo: Generate Images Using Image Prompts
-    URL: https://docs.leonardo.ai/reference/creategeneration
-    """
-    modelId = "b24e16ff-06e3-43eb-8d33-4416c2d75876"  # Leonardo Creative model
-
-    text = await text_translator(prompt)    # перевод текста
-    logger.info(f"Подсказка: {text}")
-    if not text:
-        return None
-
-    payload = {
-        "alchemy": True,
-        "num_images": 1,
-        "height": 512,
+        "height": 1024,
+        "width": 576,
         "modelId": modelId,
         "prompt": text,
-        "width": 512,
-        # "init_strength": 0.5,
-        "presetStyle": 'CREATIVE',
-        # "photoRealVersion": "v1", - не работает
-    }
+        "alchemy": True,
+        "photoReal": True,
+        "presetStyle": 'CINEMATIC',
+        "photoRealVersion": "v2",
 
-    url_image = await _generate_image(payload=payload)
-    return url_image
+
+        "controlnets": [
+            {
+                "initImageId": image_id,
+                "initImageType": "UPLOADED",
+                "preprocessorId": 133,
+                "strengthType": "Mid",
+            },
+        ],
+
+    }
+    image_url, image_id = await _generate_image(payload=payload)
+    s.image.delete_generation_by_id(id=image_id)
+    return image_url
 
 
 async def generate_motion_by_image(image_file: io.BytesIO, extension: str):
@@ -162,30 +208,78 @@ async def generate_motion_by_image(image_file: io.BytesIO, extension: str):
     payload = {
         "imageId": image_id,
         "isInitImage": True,
-        "motionStrength": 5
+        "motionStrength": 2,
     }
     url_motion = await _generate_motion(payload=payload)
     return url_motion
 
 
+async def universal_upscaler_image(image_file: io.BytesIO, extension: str):
+    """
+    Метод Leonardo: Create using Universal Upscaler
+    url: https://docs.leonardo.ai/docs/image-variations-with-universal-upscaler
+    """
+    url = "https://cloud.leonardo.ai/api/rest/v1/variations/universal-upscaler"
+    image_id = await _upload_image(image_file, extension)
+    logger.info(f'image_id: {image_id}')
+
+    payload = {
+        "upscalerStyle": "GENERAL",
+        "creativityStrength": 3,
+        "upscaleMultiplier": 1.5,
+        "initImageId": image_id
+    }
+
+    response = requests.post(url, json=payload, headers=headers)
+    logger.info("Статус генерации изображения: %s" % response.status_code)
+    variation_id = response.json()['universalUpscaler']['id']
+    url = "https://cloud.leonardo.ai/api/rest/v1/variations/%s" % variation_id
+    await asyncio.sleep(70)
+    response = requests.get(url, headers=headers)
+    logger.info(f"Данные изображения: {response.json()}")
+    try:
+        image_url = response.json()['generated_image_variation_generic'][0]['url']
+        image_id = response.json()['generated_image_variation_generic'][0]['id']
+        return image_url
+    except Exception as e:
+        logger.error(f"Ошибка при получении сгенерированного изображения: {e}")
+        await asyncio.sleep(20)
+        logger.info(f"Вторая попытка получения изображения")
+        try:
+            await asyncio.sleep(20)
+            logger.info(f"Вторая попытка получения изображения")
+            response = requests.get(url, headers=headers)
+            image_url = response.json()['generated_image_variation_generic'][0]['url']
+            image_id = response.json()['generated_image_variation_generic'][0]['id']
+            logger.info(f"Данные изображения: {response.json()}")
+            return image_url
+        except Exception as e:
+            logger.error(f"Ошибка при получении сгенерированного изображения: {e}")
+
+
+async def get_api_subscription_tokens():
+    data = s.user.get_user_self()
+    api_subscription_tokens = data.object.user_details[0].api_subscription_tokens
+    return api_subscription_tokens
+
 
 if __name__ == "__main__":
     logging.basicConfig(
         stream=sys.stdout,
-        # filename='log.log',
         level=logging.INFO,
         encoding='utf-8',
         format='%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%m.%d.%Y',
     )
-    IMAGE_FILE = "C://Users/faerf/PycharmProjects/telegram_bot_AI_generation_images/app/workspace/test.jpg"
+    IMAGE_FILE = "media_examples/original.jpg"
     with open(IMAGE_FILE, 'rb') as file:
         image_bytes = io.BytesIO(file.read())
-        # asyncio.run(generate_image_by_image(file, prompt="Create an image of a bear in sea.", extension='jpg'))
+        # asyncio.run(generate_image_by_image(image_bytes, prompt="Супергерой из marvel который может всё, а на заднем фоне крутая машина", extension='jpg'))
         # asyncio.run(generate_motion_by_image(image_file=image_bytes, extension='jpg'))
+        # asyncio.run(universal_upscaler_image(image_file=image_bytes, extension='jpg'))
 
         # image_bytes = io.BytesIO(file.read())
-        # asyncio.run(generate_image_by_image(file, prompt="Create an image of a bear in sea.", extension='jpg'))
+        # asyncio.run(generate_image_by_image(image_bytes, prompt="Create an image of a bear in sea.", extension='jpg'))
 
-    asyncio.run(generate_image_by_text_prompt(prompt="Создайте образ медведя в облаках. Очень детализировано"))
-
+    # asyncio.run(generate_image_by_text_prompt(prompt="Супергерой из marvel который может всё"))
+    print(asyncio.run(get_api_subscription_tokens()))
