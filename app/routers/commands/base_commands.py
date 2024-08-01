@@ -3,7 +3,7 @@ import os.path
 from aiogram import Router, html
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, InputMediaPhoto, FSInputFile
+from aiogram.types import Message, FSInputFile
 from aiogram.utils.media_group import MediaGroupBuilder
 
 from app import keyboards as kb
@@ -15,6 +15,8 @@ from app.templates.messages_templates import MESSAGE_HELP, TEXT_FOR_PROFILE, MES
 from config import MEDIA_DIR
 
 router = Router(name=__name__)
+
+VIDEO = FSInputFile(f'{MEDIA_DIR}/promo.mp4')
 
 
 @router.message(CommandStart())
@@ -28,7 +30,6 @@ async def command_start_handler(message: Message, state: FSMContext) -> None:
     user_id = message.from_user.id
 
     user_data = await db.get_user_data(user_id=user_id)
-    # used_generations = user_data.get('used_generations')
 
     if not user_data:
         name = message.from_user.first_name
@@ -36,18 +37,29 @@ async def command_start_handler(message: Message, state: FSMContext) -> None:
         await db.add_user(user_id=user_id, name=name, username=username)
         mess = 'Вам доступно 3 генерации\n' \
                '/buy - покупка генераций'
-        media_group = MediaGroupBuilder(
-            caption=MESSAGE_START_FOR_NEW_USERS.format(name=html.bold(message.from_user.full_name)) + mess)
-        media_group.add(type='photo', media=FSInputFile(f'{MEDIA_DIR}/original.jpg'))
-        media_group.add(type='photo', media=FSInputFile(f'{MEDIA_DIR}/result.jpg'))
-        await message.bot.send_media_group(user_id, media=media_group.build())
+        await message.bot.send_video(chat_id=message.chat.id,
+                                         caption=MESSAGE_START_FOR_NEW_USERS.format(name=html.bold(message.from_user.full_name)) + mess,
+                                         allow_sending_without_reply=True,
+                                         video=VIDEO,
+                                         reply_markup=await kb.start_menu(),
+                                     )
+        # media_group = MediaGroupBuilder(
+        #     caption=MESSAGE_START_FOR_NEW_USERS.format(name=html.bold(message.from_user.full_name)) + mess)
+        # media_group.add(type='photo', media=FSInputFile(f'{MEDIA_DIR}/original.jpg'))
+        # media_group.add(type='photo', media=FSInputFile(f'{MEDIA_DIR}/result.jpg'))
+        # await message.bot.send_media_group(user_id, media=media_group.build())
     else:
-        await message.answer(MESSAGE_START, reply_markup=await kb.start_menu())
+        await message.bot.send_video(chat_id=message.chat.id,
+                                         caption=MESSAGE_START,
+                                         allow_sending_without_reply=True,
+                                         video=VIDEO,
+                                         reply_markup=await kb.start_menu(),
+                                     )
     await state.clear()
 
 
 @router.message(Command('help'))
-async def command_test_handler(message: Message, state: FSMContext) -> None:
+async def command_help_handler(message: Message, state: FSMContext) -> None:
     """
     Метод для обработки команды '/help', для отправки инструктирующего сообщения.
     :param message: Сообщение-entity
@@ -65,24 +77,16 @@ async def command_buy_handler(message: Message, state: FSMContext) -> None:
     :param state: Состояние
     """
     await state.clear()
-    await message.answer(f'Выберите количество генераций, которые вы хотите приобрести:\n\n'
-                         f'💛1 неделя - 199 руб.\n'
-                         f'🩵2 недели - 400 руб.\n'
-                         f'❤️Месяц - 549 руб.\n',
+    await message.answer(f'Выберите платёжный план, который хотите приобрести:\n\n'
+                         f'💛1 неделя - 299 руб.\n'
+                         f'🩵2 недели - 600 руб.\n'
+                         f'❤️Месяц - 1100 руб.\n',
                          reply_markup=await kb.generations())
 
 
-@router.message(Command('account'), Admins())
-async def command_buy_handler(message: Message, state: FSMContext) -> None:
-    await state.clear()
-    tokens = await get_api_subscription_tokens()
-    await message.answer(TEXT_FOR_ADMINS_PROFILE.format(name=message.from_user.first_name,
-                                                        user_id=message.from_user.id,
-                                                        tokens=tokens), reply_markup=await kb.personal_area())
-
 
 @router.message(Command('get_user_list'), Admins())
-async def command_buy_handler(message: Message, state: FSMContext) -> None:
+async def command_get_user_list_handler(message: Message, state: FSMContext) -> None:
     await state.clear()
     users_sequence = await db.get_user_list()
     users_list = []
@@ -93,8 +97,17 @@ async def command_buy_handler(message: Message, state: FSMContext) -> None:
                          '№  |  Имя  |  username   \n\n' + '\n'.join(users_list), reply_markup=await kb.cancel())
 
 
+@router.message(Command('account'), Admins())
+async def command_account_handler(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    tokens = await get_api_subscription_tokens()
+    await message.answer(TEXT_FOR_ADMINS_PROFILE.format(name=message.from_user.first_name,
+                                                        user_id=message.from_user.id,
+                                                        tokens=tokens), reply_markup=await kb.personal_area())
+
+
 @router.message(Command('account'))
-async def command_buy_handler(message: Message, state: FSMContext) -> None:
+async def command_account_handler(message: Message, state: FSMContext) -> None:
     """
     Метод для обработки команды '/account'
     :param message: Сообщение-entity

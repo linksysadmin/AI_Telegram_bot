@@ -2,7 +2,7 @@ import logging
 
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils import markdown
 
 from app import keyboards as kb
@@ -11,8 +11,8 @@ from app.filters.user_filters import Subscribe, Admins
 from app.image_generate import get_api_subscription_tokens
 from app.routers.payment.base_payment import invoice
 from app.templates.messages_templates import TEXT_FOR_PROFILE, MESSAGE_START, TEXT_FOR_ADMINS_PROFILE
-from app.states import Generation
-
+from app.states import Generation, GenerationMusic
+from config import ADMIN_LIST
 
 logger = logging.getLogger(__name__)
 router = Router(name=__name__)
@@ -42,7 +42,10 @@ async def handler_account(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.message.edit_text(TEXT_FOR_ADMINS_PROFILE.format(name=callback.from_user.first_name,
 
                                                                     user_id=callback.from_user.id,
-                                                                    tokens=tokens), reply_markup=await kb.personal_area())
+                                                                    tokens=tokens),
+                                     reply_markup=await kb.personal_area())
+
+
 @router.callback_query(F.data == 'account')
 async def handler_account(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
@@ -63,7 +66,6 @@ async def handler_account(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.message.answer(f'Нажмите /start для начала')
 
 
-
 @router.callback_query(F.data == 'newsletter', Admins())
 async def handler_newsletter(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.message.edit_text("Напишите ваше сообщение для рассылки:", reply_markup=await kb.cancel())
@@ -74,20 +76,24 @@ async def handler_newsletter(callback: CallbackQuery, state: FSMContext) -> None
 async def handler_send_newsletter(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.message.delete()
     user_data = await state.get_data()
-    text_newsletter = user_data.get('newsletter')
+    message_id = user_data.get('message_id')
+    chat_id = callback.message.chat.id
+
     await state.clear()
 
     users = await db.get_user_list()
     count = 0
-
     for u in users:
         try:
-            await callback.message.bot.send_message(chat_id=u.id, text=text_newsletter)
+            await callback.bot.copy_message(chat_id=u.id, from_chat_id=chat_id,
+                                            message_id=message_id)
             count += 1
         except Exception as e:
+            await db.remove_user(user_id=u.id)
             logger.error(f'Ошибка отправки сообщения пользователю:{u.id} - {e}')
-    await callback.message.answer(f'Отправлено {count} сообщений из {len(users)}')
 
+    await callback.bot.delete_message(callback.message.chat.id, message_id=message_id)
+    await callback.message.answer(f'Отправлено {count} сообщений из {len(users)}')
 
 
 @router.callback_query(F.data == 'cancel')
@@ -99,16 +105,22 @@ async def handler_cancel(callback: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == 'generation', Subscribe())
 async def handler_generation_types(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await callback.message.edit_text('Что хотите сделать?', reply_markup=await kb.generations_menu())
+    await callback.message.delete()
+    await callback.message.bot.send_message(chat_id=callback.from_user.id, text='Что хотите сделать?', reply_markup=await kb.generations_menu())
+    # await callback.message.edit_text('Что хотите сделать?', reply_markup=await kb.generations_menu())
 
 
 @router.callback_query(F.data == 'generation', ~Subscribe())
-async def handler_type_cloth_callback(callback: CallbackQuery) -> None:
+async def handler_type_cloth_callback(callback: CallbackQuery, state: FSMContext) -> None:
     """
     Отрабатывает при неоформленной подписке
+    :param state:
     :param callback: Callback запрос
     """
-    await callback.message.edit_text(f'У вас нет доступных генераций', reply_markup=await kb.cancel())
+    await state.clear()
+    await callback.message.delete()
+    await callback.message.bot.send_message(chat_id=callback.from_user.id, text=f'У вас нет доступных генераций', reply_markup=await kb.cancel())
+    # await callback.message.edit_text(f'У вас нет доступных генераций', reply_markup=await kb.cancel())
 
 
 @router.callback_query(kb.TypeGenerationCallbackData.filter(), Subscribe())
@@ -148,3 +160,11 @@ async def handler_generation(callback: CallbackQuery,
                                              f'❗️️Важно:\n{markdown.hblockquote("Я не умею создавать изображения на которых 2 и более человек")}',
                                              reply_markup=await kb.cancel())
             await state.set_state(Generation.image)
+
+        case 'music_create':
+            await callback.message.edit_text(f'1️⃣ Отлично, отправьте текст вашей песни🎶:\n\n'
+                                             f'Совет:\n{markdown.hblockquote("Совет: если вы хотите трек подлиннее, ваш текст не должен быть очень короткий")}'
+                                             f'❗️️Важно:\n{markdown.hblockquote("Если же вы хотите песню с повторяющимися строчками, то продублируйте их в нужных местах")}',
+                                             reply_markup=await kb.cancel())
+            await state.set_state(GenerationMusic.lyric)
+

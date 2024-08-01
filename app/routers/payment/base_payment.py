@@ -7,7 +7,6 @@ from aiogram.types import LabeledPrice
 from aiogram import types, Router, F, html
 
 from app.database.requests import db
-from app.templates.messages_templates import TEXT_FOR_PROFILE
 from config import PAYMENT_TOKEN
 
 router = Router()

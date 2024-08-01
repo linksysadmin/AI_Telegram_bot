@@ -19,9 +19,9 @@ class TypeGenerationCallbackData(CallbackData, prefix="type_gen"):
 
 
 PRICE_FOR_GENERATIONS = {
-    7: 199,
-    14: 400,
-    31: 549,
+    7: 299,
+    14: 600,
+    31: 1100,
 }
 
 
@@ -38,6 +38,7 @@ async def personal_area():
     # keyboard.add(InlineKeyboardButton(text='Начать', callback_data='generation'))
     # keyboard.add(InlineKeyboardButton(text='Оставшиеся токены', callback_data='tokens'))
     keyboard.add(InlineKeyboardButton(text='Рассылка сообщения', callback_data='newsletter'))
+    keyboard.add(InlineKeyboardButton(text='Назад', callback_data='cancel'))
     keyboard.adjust(1)
     return keyboard.as_markup()
 
@@ -45,6 +46,7 @@ async def personal_area():
 async def generations_menu():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='🌠Создать картинку по запросу', callback_data=TypeGenerationCallbackData(type_gen='request').pack()))
+    keyboard.add(InlineKeyboardButton(text='🎧Создать музыкальное произведение', callback_data=TypeGenerationCallbackData(type_gen='music_create').pack()))
     keyboard.add(InlineKeyboardButton(text='👥Изменить своё фото', callback_data=TypeGenerationCallbackData(type_gen='image_and_request').pack()))
     keyboard.add(InlineKeyboardButton(text='🧪Анимировать картинку', callback_data=TypeGenerationCallbackData(type_gen='animation').pack()))
     keyboard.add(InlineKeyboardButton(text='🔮Улучшить качество фото', callback_data=TypeGenerationCallbackData(type_gen='improve').pack()))

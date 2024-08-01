@@ -5,5 +5,8 @@ class Generation(StatesGroup):
     prompt = State()
     image = State()
     newsletter = State()
-    # check_newsletter = State()
 
+
+class GenerationMusic(StatesGroup):
+    lyric = State()
+    tag = State()

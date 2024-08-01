@@ -93,9 +93,10 @@ async def _generate_image(message: Message, state: FSMContext):
         await message.answer(
             text=f'К сожалению боту не удалось сгенерировать ваш запрос.', reply_markup=await kb.cancel())
     try:
-        await db.add_used_generation(message.from_user.id)
+        await db.add_used_and_daily_generation(message.from_user.id)
     except Exception as e:
         logger.error(f"Ошибка при запросе в базу данных: {e}")
+
 
 
 
