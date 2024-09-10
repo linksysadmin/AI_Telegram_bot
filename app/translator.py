@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 from googletrans import Translator
@@ -21,7 +20,3 @@ async def text_translator(text: str, src='ru', dest='en') -> str | None:
     except Exception as e:
         logger.error(f'Ошибка перевода текста: {e}')
         return None
-
-
-if __name__ == '__main__':
-    print(asyncio.run(text_translator('Прекрасная погода')))

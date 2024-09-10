@@ -12,3 +12,4 @@ client_telegram_bot_generation_photo.service
 .idea
 __pycache__
 app/database/database.db
+database.db

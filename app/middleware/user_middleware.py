@@ -3,13 +3,14 @@ from typing import Callable, Awaitable, Any, Dict
 
 import redis
 from aiogram import BaseMiddleware
-
 from aiogram.types import TelegramObject, ChatMemberLeft, CallbackQuery
 from aiogram.fsm.storage.redis import RedisStorage
 
 from app.keyboards import subscribe
-from app.templates.messages_templates import NOT_SUB_MESSAGE
+from app.localization_loader import LocalizationLoader
 from config import TELEGRAM_CHANEL_ID
+
+locales = LocalizationLoader()
 
 
 class CheckUserInGroupMiddleware(BaseMiddleware):
@@ -33,8 +34,8 @@ class CheckUserInGroupMiddleware(BaseMiddleware):
                 match user_status:
                     case ChatMemberLeft():
                         if type(event) == CallbackQuery:
-                            return await event.message.edit_text(NOT_SUB_MESSAGE, reply_markup=await subscribe())
-                        return await event.answer(NOT_SUB_MESSAGE, reply_markup=await subscribe())
+                            return await event.message.edit_text(locales.get_message(language=event.from_user.language_code, message_key='not_sub_message'), reply_markup=await subscribe(event.from_user.language_code))
+                        return await event.answer(locales.get_message(language=event.from_user.language_code, message_key='not_sub_message'), reply_markup=await subscribe(event.from_user.language_code))
                     case _:
                         await self.storage.redis.set(name=user, value=1)
                         return await handler(event, data)

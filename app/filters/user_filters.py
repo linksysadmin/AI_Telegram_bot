@@ -17,7 +17,6 @@ class Subscribe(Filter):
         subscription_end_date = user_data.get('subscription_end_date')
 
         if used_generations < 3 or user_id in ADMIN_LIST:
-            logging.info(f'user: {user_id} | used_generations: {used_generations}')
             return True
         if subscription_end_date is None or subscription_end_date < datetime.datetime.now():
             logging.info(f'subscription_end_date: {subscription_end_date}')
@@ -34,5 +33,17 @@ class Admins(Filter):
         user_id = message.from_user.id
         if user_id in ADMIN_LIST:
             return True
+
+
+
+class UserInDatabase(Filter):
+    async def __call__(self, message: Message) -> bool:
+        user_id = message.from_user.id
+        user_data = await db.get_user_data(user_id=user_id)
+        if user_data:
+            return True
+        else:
+            return False
+
 
 

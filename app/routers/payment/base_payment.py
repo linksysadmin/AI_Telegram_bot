@@ -1,53 +1,75 @@
 import datetime
 import json
+import logging
 from datetime import timedelta
 
+import aiogram
 from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice
 from aiogram import types, Router, F, html
 
 from app.database.requests import db
-from config import PAYMENT_TOKEN
+from config import YKASSA_PAYMENT_TOKEN, STRIPE_PAYMENT_TOKEN
+from app.localization_loader import LocalizationLoader
 
+logger = logging.getLogger(__name__)
+locales = LocalizationLoader()
 router = Router()
 
 
-async def invoice(callback, price: float) -> None:
+async def invoice(callback, price: float, payment_type: str) -> None:
     """
-    Метод для отправки счетов. В случае успеха отправленное сообщение возвращается.
-    :param callback: Callback запрос
-    :param price: Сумма
+    :param payment_type:
+    :param callback:
+    :param price: num
+    :return:
     """
+    if payment_type == 'stripe':
+        TOKEN = STRIPE_PAYMENT_TOKEN
+        currency = 'usd'
+    else:
+        TOKEN = YKASSA_PAYMENT_TOKEN
+        currency = 'rub'
 
-    await callback.bot.send_invoice(
-        chat_id=callback.message.chat.id,
-        title='Генерации',
-        description='Активация генераций',
-        provider_token=PAYMENT_TOKEN,
-        currency='rub',
-        # is_flexible=False,
-        prices=[
-            LabeledPrice(label=f'Генерации', amount=100 * int(price)),
-        ],
-        payload='invoice-payload',
-        provider_data=json.dumps(
-            {'receipt':
-                {'items': [
-                    {'description': 'Активация генераций',
-                     'quantity': '1',
-                     'amount': {
-                         'value': str(price),
-                         'currency': 'RUB',
-                     },
-                     'vat_code': 1,
-                     }
-                ], 'email': 'mail@mail.ru',
-                },
+    generation_text = locales.get_message(language=callback.from_user.language_code,
+                                          message_key='generations')
+    activate_generation_text = locales.get_message(language=callback.from_user.language_code,
+                                                   message_key='activate_generations')
+    try:
+        await callback.bot.send_invoice(
+            chat_id=callback.message.chat.id,
+            title=generation_text,
+            description=activate_generation_text,
+            provider_token=TOKEN,
+            currency=currency,
+            # is_flexible=False,
+            prices=[
+                LabeledPrice(label=generation_text, amount=100 * int(price)),
+            ],
+            payload='invoice-payload',
+            provider_data=json.dumps(
+                {'receipt':
+                    {'items': [
+                        {'description': activate_generation_text,
+                         'quantity': '1',
+                         'amount': {
+                             'value': str(price),
+                             'currency': currency.upper(),
+                         },
+                         'vat_code': 1,
+                         }
+                    ], 'email': 'mail@mail.ru',
+                    },
 
-            }),
-        need_email=False,
-        send_email_to_provider=False,
-    )
+                }),
+            need_email=False,
+            send_email_to_provider=False,
+        )
+    except aiogram.exceptions.TelegramBadRequest as e:
+        logger.error(f'Ошибка при оплате подписки: {e} | TOKEN = {TOKEN} | PAYMENT TYPE = {payment_type}')
+        await callback.bot.send_message(chat_id=callback.message.chat.id,
+                                        text=locales.get_message(language=callback.from_user.language_code,
+                                                                 message_key='error_invoice'))
 
 
 @router.pre_checkout_query(lambda query: True)
@@ -83,8 +105,6 @@ async def successful_payment(message: types.Message,
 
     await db.subscribe_user(user_id, subscription_end_date)
     await db.add_payment(user_id, purchase_amount, subscription_end_date)
-    await message.bot.send_message(message.chat.id,
-                                   f"✅ {html.bold('Оформлена подписка до:')}\n"
-                                   f"{html.pre(subscription_end_date.strftime('%d.%m.%Y %H:%M'))}\n"
-                                   f"/start - начать\n"
-                                   f"Успешной генерации 📸🎉!")
+    await message.bot.send_message(message.chat.id, text=locales.get_message(language=message.from_user.language_code,
+                                                                             message_key='successful_payment').format(
+        date=subscription_end_date.strftime('%d.%m.%Y %H:%M')))

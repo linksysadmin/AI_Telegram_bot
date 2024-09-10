@@ -257,21 +257,18 @@ async def universal_upscaler_image(image_file: io.BytesIO, extension: str):
             logger.error(f"Ошибка при получении сгенерированного изображения: {e}")
 
 
-async def get_api_subscription_tokens():
-    data = s.user.get_user_self()
-    api_subscription_tokens = data.object.user_details[0].api_subscription_tokens
-    return api_subscription_tokens
-
+async def get_api_subscription_tokens() -> str | int:
+    try:
+        data = s.user.get_user_self()
+        api_subscription_tokens = data.object.user_details[0].api_subscription_tokens
+        return api_subscription_tokens
+    except leonardoaisdk.models.errors.sdkerror.SDKError as e:
+        error_mess = 'Ошибка при получении количества токенов LeonardoAI'
+        logger.error(f"{error_mess}: {e}")
+        return error_mess
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        stream=sys.stdout,
-        level=logging.INFO,
-        encoding='utf-8',
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%m.%d.%Y',
-    )
-    IMAGE_FILE = "media_examples/original.jpg"
+    IMAGE_FILE = "../data/media/original.jpg"
     with open(IMAGE_FILE, 'rb') as file:
         image_bytes = io.BytesIO(file.read())
         # asyncio.run(generate_image_by_image(image_bytes, prompt="Супергерой из marvel который может всё, а на заднем фоне крутая машина", extension='jpg'))

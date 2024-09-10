@@ -1,7 +1,7 @@
 import asyncio
 import logging
-import os
 import sys
+from logging.handlers import RotatingFileHandler
 
 from aiohttp import web
 
@@ -12,20 +12,23 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-from app.database.requests import db
 from config import TELEGRAM_TOKEN, BASE_WEBHOOK_URL, WEBHOOK_PATH, WEB_SERVER_HOST, WEB_SERVER_PORT, REDIS_URL, DEBUG
 from app.middleware.user_middleware import CheckUserInGroupMiddleware
 from app.routers import router as main_router
 from tasks import launching_the_daily_generation_reset_task
 
-logging.basicConfig(
-    stream=sys.stdout,
-    # filename='log.log',
-    level=logging.INFO,
-    encoding='utf-8',
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%m.%d.%Y',
-)
+log = logging.getLogger('')
+log.setLevel(logging.INFO)
+
+format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt='%m.%d.%Y| %H:%M:%S')
+
+console_stream = logging.StreamHandler(sys.stdout)
+console_stream.setFormatter(format)
+log.addHandler(console_stream)
+
+file_stream = RotatingFileHandler('log.log', maxBytes=(1048576*5), backupCount=7)
+file_stream.setFormatter(format)
+log.addHandler(file_stream)
 
 storage = RedisStorage.from_url(REDIS_URL)
 dp = Dispatcher()

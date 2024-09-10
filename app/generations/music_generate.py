@@ -4,10 +4,11 @@ from suno import Suno
 from app.translator import text_translator
 from config import SUNO_COOKIE
 
-client = Suno(cookie=SUNO_COOKIE)
+
 
 
 async def generate(prompt, tags):
+    client = Suno(cookie=SUNO_COOKIE)
     songs = await asyncio.to_thread(client.generate,
                                     prompt=prompt,
                                     is_custom=True,

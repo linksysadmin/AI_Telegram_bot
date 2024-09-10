@@ -55,6 +55,22 @@ class Database:
             logging.error('Базы Данных или таблицы не существует')
 
 
+    async def update_user_data(self, user_id: int, name: str = None, username: str = None) -> None:
+        try:
+            async with self.__async_session_factory() as session:
+                user = await session.get(UsersORM, user_id)
+                if name is not None:
+                    user.name = name
+                if username is not None:
+                    user.username = username
+                session.add(user)
+                await session.commit()
+        except sqlalchemy.exc.OperationalError:
+            logging.error('Базы Данных или таблицы не существует')
+
+
+
+
     async def remove_user(self, user_id: int) -> None:
         """
         Удаляет пользователя из БД
