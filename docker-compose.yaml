@@ -19,5 +19,7 @@ services:
     restart: always
     depends_on:
       - redis
+    ports:
+      - "8069:8080"
     networks:
       - dev

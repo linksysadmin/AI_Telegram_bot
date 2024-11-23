@@ -6,7 +6,7 @@ load_dotenv()
 
 # Database and Redis
 DATABASE = "sqlite+aiosqlite:///database.db"
-REDIS_URL = os.getenv("REDIS_URL")
+REDIS_URL = 'redis://redis:6379/2'
 
 # Telegram Bot
 TELEGRAM_CHANEL_ID = os.getenv("TELEGRAM_CHANEL_ID")
@@ -31,8 +31,8 @@ HEIGEN_AI_TOKEN = os.getenv("HEIGEN_AI_TOKEN")
 # For WEBHOOK
 BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")
 WEBHOOK_PATH = f'/{TELEGRAM_TOKEN}'
-WEB_SERVER_HOST = os.getenv("WEB_SERVER_HOST")
-WEB_SERVER_PORT = int(os.getenv("WEB_SERVER_PORT"))
+WEB_SERVER_HOST = '0.0.0.0'  # прослушивать все доступные интерфейсы внутри контейнера Docker
+WEB_SERVER_PORT = 8080  # прослушивать порт 8080 внутри контейнера
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -40,4 +40,4 @@ MEDIA_DIR = os.path.join(BASE_DIR, 'app', 'data', 'media')
 LOCALES_DIR = os.path.join(BASE_DIR, 'app', 'data', 'locales')
 
 
-DEBUG = os.getenv('DEBUG')
+DEBUG = False

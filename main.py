@@ -51,6 +51,9 @@ async def on_startup(bot: Bot) -> None:
     await bot.set_webhook(
         f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
     )
+    # await bot.set_webhook(
+    #     f"{BASE_WEBHOOK_URL}/",
+    # )
     logging.warning(f'Вебхук задан: {await bot.get_webhook_info()}')
 
 
@@ -94,7 +97,5 @@ if __name__ == "__main__":
     if DEBUG:
         asyncio.run(start_bot_testing_mode())
     else:
-        try:
-            main()
-        except Exception as e:
-            logging.error(e)
+        main()
+
