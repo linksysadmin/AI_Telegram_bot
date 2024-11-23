@@ -20,6 +20,6 @@ services:
     depends_on:
       - redis
     ports:
-      - "8069:8080"
+      - "8071:8080"
     networks:
       - dev
