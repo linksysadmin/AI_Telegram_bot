@@ -65,6 +65,10 @@ async def generations_menu(language):
                                                                message_key='improve_photo_quality_button'),
                                       callback_data=TypeGenerationCallbackData(type_gen='improve').pack()))
     keyboard.add(InlineKeyboardButton(text=locales.get_message(language=language,
+                                                               message_key='video_translator_button'),
+                                      url='https://t.me/Video_translator_Aurora_bot'
+                 ))
+    keyboard.add(InlineKeyboardButton(text=locales.get_message(language=language,
                                                                message_key='back_button'), callback_data='cancel'))
     keyboard.adjust(1)
     return keyboard.as_markup()

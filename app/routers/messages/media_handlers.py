@@ -78,7 +78,7 @@ async def _generate_image(message: Message, state: FSMContext):
                 case 'improve':
                     url = await image_generate.universal_upscaler_image(image_file, extension='jpg')
                 case 'animation':
-                    url = await image_generate.generate_motion_by_image(image_file=image_file, extension='jpg')
+                    url = await image_generate.generate_animation_by_image(image_file=image_file, extension='jpg')
                     extension = 'mp4'
             if url:
                 async with aiohttp.ClientSession() as session:

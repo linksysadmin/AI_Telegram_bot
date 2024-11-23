@@ -8,16 +8,14 @@ import logging
 import sys
 from typing import Dict, Tuple
 
-import leonardoaisdk
+# import leonardoaisdk
 import requests
 import json
 
 from app.translator import text_translator
 from config import LEONARDO_AI_TOKEN
 
-
 logger = logging.getLogger(__name__)
-
 
 api_key = LEONARDO_AI_TOKEN
 authorization = "Bearer %s" % api_key
@@ -27,10 +25,9 @@ headers = {
     "authorization": authorization
 }
 
-s = leonardoaisdk.LeonardoAiSDK(
-    bearer_auth=LEONARDO_AI_TOKEN,
-)
-
+#s = leonardoaisdk.LeonardoAiSDK(
+#    bearer_auth=LEONARDO_AI_TOKEN,
+#)
 
 
 async def _upload_image(image_file: io.BytesIO, extension):
@@ -43,7 +40,8 @@ async def _upload_image(image_file: io.BytesIO, extension):
 
     url = "https://cloud.leonardo.ai/api/rest/v1/init-image"
     payload = {"extension": extension}
-    response = requests.post(url, json=payload, headers=headers)    # Получить заранее заданный URL-адрес для загрузки изображения
+    response = requests.post(url, json=payload,
+                             headers=headers)  # Получить заранее заданный URL-адрес для загрузки изображения
 
     # Загрузить изображение по заданному URL-адресу
     fields = json.loads(response.json()['uploadInitImage']['fields'])
@@ -66,16 +64,22 @@ async def _generate_motion(payload: Dict) -> str:
     """
     url = "https://cloud.leonardo.ai/api/rest/v1/generations-motion-svd"
     response = requests.post(url, json=payload, headers=headers)
-    logger.info("Получение видео")
-    logger.info(response.json())
+    logger.info(f"Отправка запроса на анимацию: {response.json()}")
     generation_id = response.json()['motionSvdGenerationJob']['generationId']
-
     url = "https://cloud.leonardo.ai/api/rest/v1/generations/%s" % generation_id
-    await asyncio.sleep(60)
-    response = requests.get(url, headers=headers)
-    logger.info(f"Данные видео: {response.json()}")
 
-    image_url = response.json()['generations_by_pk']['generated_images'][0]['motionMP4URL']
+    image_url = None
+    result = 0
+    while result != 3:
+        await asyncio.sleep(60)
+        try:
+            response = requests.get(url, headers=headers)
+            image_url = response.json()['generations_by_pk']['generated_images'][0]['motionMP4URL']
+            logger.info(f"Данные анимации: {response.json()}")
+            result = 3
+        except Exception as e:
+            logger.error(f"Ошибка при получении файла анимации: {e}")
+            result += 1
     return image_url
 
 
@@ -112,9 +116,6 @@ async def _generate_image(payload: Dict) -> Tuple:
             logger.error(f"Ошибка при получении сгенерированного изображения: {e}")
 
 
-
-
-
 async def generate_image_by_text_prompt(prompt: str):
     """
     Метод Leonardo: Generate Images Using Image Prompts
@@ -124,7 +125,7 @@ async def generate_image_by_text_prompt(prompt: str):
     """
     modelId = "aa77f04e-3eec-4034-9c07-d0f619684628"  # Leonardo Kino XL model
 
-    text = await text_translator(prompt)    # перевод текста
+    text = await text_translator(prompt)  # перевод текста
     logger.info(f"Подсказка: {text}")
     if not text:
         return None
@@ -142,7 +143,7 @@ async def generate_image_by_text_prompt(prompt: str):
     }
 
     image_url, image_id = await _generate_image(payload=payload)
-    s.image.delete_generation_by_id(id=image_id)
+    #s.image.delete_generation_by_id(id=image_id)
     return image_url
 
 
@@ -163,8 +164,7 @@ async def generate_image_by_image(image_file: io.BytesIO, extension: str, prompt
     """
     modelId = "aa77f04e-3eec-4034-9c07-d0f619684628"
 
-
-    text = await text_translator(prompt)    # перевод текста
+    text = await text_translator(prompt)  # перевод текста
     logger.info(f"Подсказка: {text}")
     if not text:
         return None
@@ -182,7 +182,6 @@ async def generate_image_by_image(image_file: io.BytesIO, extension: str, prompt
         "presetStyle": 'CINEMATIC',
         "photoRealVersion": "v2",
 
-
         "controlnets": [
             {
                 "initImageId": image_id,
@@ -194,11 +193,11 @@ async def generate_image_by_image(image_file: io.BytesIO, extension: str, prompt
 
     }
     image_url, image_id = await _generate_image(payload=payload)
-    s.image.delete_generation_by_id(id=image_id)
+    #s.image.delete_generation_by_id(id=image_id)
     return image_url
 
 
-async def generate_motion_by_image(image_file: io.BytesIO, extension: str):
+async def generate_animation_by_image(image_file: io.BytesIO, extension: str):
     """
     Метод Leonardo: Generate Motion Using Uploaded Images
     url: https://docs.leonardo.ai/docs/generate-motion-using-uploaded-images
@@ -258,14 +257,15 @@ async def universal_upscaler_image(image_file: io.BytesIO, extension: str):
 
 
 async def get_api_subscription_tokens() -> str | int:
-    try:
-        data = s.user.get_user_self()
-        api_subscription_tokens = data.object.user_details[0].api_subscription_tokens
-        return api_subscription_tokens
-    except leonardoaisdk.models.errors.sdkerror.SDKError as e:
-        error_mess = 'Ошибка при получении количества токенов LeonardoAI'
-        logger.error(f"{error_mess}: {e}")
-        return error_mess
+    #try:
+
+        #data = s.user.get_user_self()
+        #api_subscription_tokens = data.object.user_details[0].api_subscription_tokens
+        #return api_subscription_tokens
+    #except Exception as e:
+    error_mess = 'Ошибка при получении количества токенов LeonardoAI'
+    return error_mess
+
 
 if __name__ == "__main__":
     IMAGE_FILE = "../data/media/original.jpg"

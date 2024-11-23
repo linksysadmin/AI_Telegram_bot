@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Sequence
 
 import sqlalchemy
+from aiogram.types import Message
 from sqlalchemy import select, DateTime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
@@ -219,6 +220,15 @@ class Database:
 
 
 db = Database()
+
+
+async def update_user_info(message: Message) -> None:
+    user_data = await db.get_user_data(user_id=message.from_user.id)
+    name = message.from_user.first_name
+    username = message.from_user.username
+
+    if name != user_data.get('name') or username != user_data.get('username'):
+        await db.update_user_data(message.from_user.id, message.from_user.first_name, message.from_user.username)
 
 
 if __name__ == "__main__":

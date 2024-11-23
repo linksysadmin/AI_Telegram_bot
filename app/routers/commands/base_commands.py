@@ -1,32 +1,40 @@
+import logging
+
 from aiogram import Router
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import default_state
 from aiogram.types import Message, FSInputFile
 
 from app import keyboards as kb
-from app.database.requests import db
+from app.database.requests import db, update_user_info
 from app.filters.user_filters import Admins, UserInDatabase
 from app.generations.image_generate import get_api_subscription_tokens
 from app.localization_loader import LocalizationLoader
 from config import MEDIA_DIR
 
+logger = logging.getLogger(__name__)
 router = Router(name=__name__)
 
 VIDEO = FSInputFile(f'{MEDIA_DIR}/promo.mp4')
 locales = LocalizationLoader()
 
 
-@router.message(CommandStart(), UserInDatabase())
+@router.message(CommandStart(),
+                UserInDatabase(),
+                default_state)
+async def command_start_handler(message: Message) -> None:
+    await update_user_info(message)
+    await message.answer(text=locales.get_message(language=message.from_user.language_code,
+                                                         message_key='start_message'),
+                         reply_markup=await kb.start_menu(message.from_user.language_code))
+
+
+@router.message(CommandStart(),
+                UserInDatabase()
+                )
 async def command_start_handler(message: Message, state: FSMContext) -> None:
-    user_id = message.from_user.id
-    user_data = await db.get_user_data(user_id=user_id)
-
-    if (message.from_user.first_name != user_data.get('name')
-            or message.from_user.username != user_data.get('username')):
-        await db.update_user_data(user_id,
-                                  message.from_user.first_name,
-                                  message.from_user.username)
-
+    await update_user_info(message)
     await message.answer(text=locales.get_message(language=message.from_user.language_code,
                                                          message_key='start_message'),
                          reply_markup=await kb.start_menu(message.from_user.language_code))
@@ -34,26 +42,16 @@ async def command_start_handler(message: Message, state: FSMContext) -> None:
 
 
 @router.message(CommandStart())
-async def command_start_handler(message: Message, state: FSMContext) -> None:
-    user_id = message.from_user.id
-    name = message.from_user.first_name
-    username = message.from_user.username
-
-    await db.add_user(user_id=user_id, name=name, username=username)
+async def command_start_handler(message: Message) -> None:
+    await db.add_user(user_id=message.from_user.id, name=message.from_user.first_name, username=message.from_user.username)
     await message.bot.send_video(chat_id=message.chat.id,
                                  caption=locales.get_message(language=message.from_user.language_code,
                                                              message_key='start_message_for_new_users').format(
-                                     name=name),
+                                     name=message.from_user.first_name),
                                  allow_sending_without_reply=True,
                                  video=VIDEO,
                                  # reply_markup=await kb.start_menu(message.from_user.language_code),
                                  )
-    # media_group = MediaGroupBuilder(
-    #     caption=MESSAGE_START_FOR_NEW_USERS.format(name=html.bold(message.from_user.full_name)) + mess)
-    # media_group.add(type='photo', media=FSInputFile(f'{MEDIA_DIR}/original.jpg'))
-    # media_group.add(type='photo', media=FSInputFile(f'{MEDIA_DIR}/result.jpg'))
-    # await message.bot.send_media_group(user_id, media=media_group.build())
-    await state.clear()
 
 
 @router.message(Command('help'))
@@ -115,28 +113,29 @@ async def command_account_handler(message: Message, state: FSMContext) -> None:
             tokens=tokens), reply_markup=await kb.personal_area(message.from_user.language_code))
 
 
-@router.message(Command('account'))
+@router.message(Command('account'), UserInDatabase())
 async def command_account_handler(message: Message, state: FSMContext) -> None:
-    """
-    Метод для обработки команды '/account'
-    :param message: Сообщение-entity
-    :param state: Состояние
-    """
     await state.clear()
 
     user_id = message.from_user.id
     user_data = await db.get_user_data(user_id)
-    if user_data:
-        if user_data['subscription_end_date']:
-            subscription_end_date = user_data['subscription_end_date'].strftime("%d.%m.%Y %H:%M")
-        else:
-            subscription_end_date = locales.get_message(language=message.from_user.language_code,
-                                                        message_key='not_subscribe')
-        await message.answer(locales.get_message(language=message.from_user.language_code,
-                                                 message_key='text_for_profile').format(
-            name=message.from_user.first_name,
-            user_id=user_id,
-            subscription_end_date=subscription_end_date, used_generations=user_data['used_generations']))
+    if user_data.get('subscription_end_date'):
+        subscription_end_date = user_data.get('subscription_end_date').strftime("%d.%m.%Y %H:%M")
     else:
-        await message.answer(locales.get_message(language=message.from_user.language_code,
-                                                 message_key='press_start'))
+        subscription_end_date = locales.get_message(language=message.from_user.language_code,
+                                                    message_key='not_subscribe')
+    await message.answer(locales.get_message(language=message.from_user.language_code,
+                                             message_key='text_for_profile').format(
+        name=message.from_user.first_name,
+        user_id=user_id,
+        subscription_end_date=subscription_end_date, used_generations=user_data.get('used_generations')))
+
+
+@router.message(Command('account'))
+async def command_account_handler(message: Message) -> None:
+    await message.answer(locales.get_message(language=message.from_user.language_code,
+                                             message_key='press_start'))
+
+
+
+# async def get_subscription_end_date

@@ -74,6 +74,8 @@ async def get_tag_n_generate(message: Message, state: FSMContext):
                 await db.add_used_and_daily_generation(message.from_user.id)
     except Exception as e:
         logger.error(f"Ошибка при отправке генерации: {e}")
+
         await message.answer(
             text=locales.get_message(language=message.from_user.language_code, message_key='generate_music_error_message'),
             reply_markup=await kb.cancel(message.from_user.language_code))
+        raise e

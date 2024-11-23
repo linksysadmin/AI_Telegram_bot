@@ -10,7 +10,7 @@ class LocalizationLoader:
     __all_messages = {}
 
     _PATH_TO_LANGUAGE_FILE = LOCALES_DIR + "/" + "{language}.json"
-    _LANGUAGES = ['en', 'ru', 'hy']
+    _LANGUAGES = ['en', 'ru']
     _STANDARD_LANGUAGE = 'en'
 
     def __new__(cls, *args, **kwargs):

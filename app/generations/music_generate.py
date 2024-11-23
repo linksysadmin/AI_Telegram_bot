@@ -2,13 +2,14 @@ import asyncio
 from suno import Suno
 
 from app.translator import text_translator
-from config import SUNO_COOKIE
+from config import SUNO_COOKIE, SUNO_SESSION_ID
 
 
 
 
 async def generate(prompt, tags):
     client = Suno(cookie=SUNO_COOKIE)
+    # client.sid = SUNO_SESSION_ID
     songs = await asyncio.to_thread(client.generate,
                                     prompt=prompt,
                                     is_custom=True,

@@ -1,36 +1,33 @@
 import asyncio
 import logging
-import sys
 from logging.handlers import RotatingFileHandler
 
+from aiogram.fsm.storage.redis import RedisStorage
 from aiohttp import web
 
 from aiogram.client.default import DefaultBotProperties
 from aiogram.types import BotCommand
-from aiogram.fsm.storage.redis import RedisStorage
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-from config import TELEGRAM_TOKEN, BASE_WEBHOOK_URL, WEBHOOK_PATH, WEB_SERVER_HOST, WEB_SERVER_PORT, REDIS_URL, DEBUG
-from app.middleware.user_middleware import CheckUserInGroupMiddleware
+from config import TELEGRAM_TOKEN, BASE_WEBHOOK_URL, WEBHOOK_PATH, WEB_SERVER_HOST, WEB_SERVER_PORT, DEBUG, REDIS_URL
 from app.routers import router as main_router
 from tasks import launching_the_daily_generation_reset_task
 
 log = logging.getLogger('')
 log.setLevel(logging.INFO)
 
-format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt='%m.%d.%Y| %H:%M:%S')
-
-console_stream = logging.StreamHandler(sys.stdout)
-console_stream.setFormatter(format)
-log.addHandler(console_stream)
+format = logging.Formatter("[%(asctime)s.%(msecs)03d] %(module)10s:%(lineno)-3d %(levelname)-7s - %(message)s",
+                           datefmt='%m.%d.%Y| %H:%M:%S')
 
 file_stream = RotatingFileHandler('log.log', maxBytes=(1048576*5), backupCount=7)
 file_stream.setFormatter(format)
 log.addHandler(file_stream)
 
+
 storage = RedisStorage.from_url(REDIS_URL)
+# storage = RedisStorage.from_url(REDIS_URL)
 dp = Dispatcher()
 # dp.message.outer_middleware.register(CheckUserInGroupMiddleware(storage=storage))
 # dp.callback_query.outer_middleware.register(CheckUserInGroupMiddleware(storage=storage))
@@ -40,10 +37,10 @@ dp.include_router(main_router)
 bot = Bot(token=TELEGRAM_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 COMMANDS = [
-    BotCommand(command='start', description='Начать'),
-    BotCommand(command='help', description='Помощь'),
-    BotCommand(command='buy', description='Купить генерации'),
-    BotCommand(command='account', description='Личный кабинет'),
+    BotCommand(command='start', description='Start'),
+    BotCommand(command='help', description='Help'),
+    BotCommand(command='buy', description='Buy generations'),
+    BotCommand(command='account', description='Personal account'),
 ]
 
 
@@ -58,6 +55,8 @@ async def on_startup(bot: Bot) -> None:
 
 
 async def on_shutdown(bot):
+    await storage.redis.flushdb()
+    logging.warning(f'Redis очищен')
     await bot.delete_webhook()
     logging.warning(f'Вебхук удален')
 
@@ -87,6 +86,7 @@ async def start_bot_testing_mode() -> None:
         await launching_the_daily_generation_reset_task()
         await dp.start_polling(bot)
     finally:
+        await storage.redis.flushdb()
         await bot.session.close()
 
 

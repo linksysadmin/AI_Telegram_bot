@@ -1,6 +1,7 @@
 help.py
 ../telegram_generation_photo_bot/.venv
 venvl
+lvenv
 .venv
 log
 .env
@@ -8,8 +9,6 @@ del.py
 help.md
 log.log
 app/database/database.db
-client_telegram_bot_generation_photo.service
 .idea
 __pycache__
-app/database/database.db
-database.db
+*.db

@@ -3,9 +3,14 @@ import logging
 
 from aiogram.filters import Filter
 from aiogram.types import Message
+from aiogram.fsm.storage.redis import RedisStorage
 
-from config import ADMIN_LIST
+from config import ADMIN_LIST, REDIS_URL
 from app.database.requests import db
+
+
+storage = RedisStorage.from_url(REDIS_URL)
+logger = logging.getLogger(__name__)
 
 
 class Subscribe(Filter):
@@ -39,11 +44,20 @@ class Admins(Filter):
 class UserInDatabase(Filter):
     async def __call__(self, message: Message) -> bool:
         user_id = message.from_user.id
-        user_data = await db.get_user_data(user_id=user_id)
-        if user_data:
+        user = await storage.redis.get(name=f'user_{user_id}')
+        if user:
+            logger.info(f'Пользователь: {user_id} в кэш памяти')
             return True
         else:
-            return False
+            logger.info(f'Пользователя: {user_id} нет в кэш памяти')
+            user_data = await db.get_user_data(user_id=user_id)
+            if user_data:
+                logger.info(f'Пользователь: {user_id} есть в БД')
+                await storage.redis.set(name=f'user_{user_id}', value=1)
+                return True
+            else:
+                logger.info(f'Пользователя: {user_id} нет в БД')
+                return False
 
 
 

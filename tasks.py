@@ -31,19 +31,6 @@ async def reset_daily_generations():
             logger.error(f'Ошибка сброса ежедневных генераций: {e}')
 
 
-# async def reset_daily_generations():
-#     """Задача сброса ежедневных генераций
-#      у каждого пользователя """
-#     while True:
-#         await asyncio.sleep(10)
-#         logger.info('Сброс ежедневных генераций')
-#         try:
-#             await db.reset_daily_limit_for_all_users()
-#         except Exception as e:
-#             logger.error(f'Ошибка сброса ежедневных генераций: {e}')
-
-
-
 async def launching_the_daily_generation_reset_task() -> None:
     """
     Запускает задачу сброса ежедневных генераций у каждого пользователя
