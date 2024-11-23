@@ -1,6 +1,6 @@
 networks:
   dev:
-
+version: '3.8'
 services:
   redis:
     image: redis:alpine
@@ -24,3 +24,10 @@ services:
       - "8071:8080"
     networks:
       - dev
+    volumes:
+      - telegram_bot_AI_data:/var/www/telegram_bot_AI_data
+
+
+
+volumes:
+  telegram_bot_AI_data:
