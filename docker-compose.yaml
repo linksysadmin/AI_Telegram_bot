@@ -25,8 +25,7 @@ services:
     networks:
       - dev
     volumes:
-      - telegram_bot_AI_data:/var/www/telegram_bot_AI_data
-
+      - ./database.db:/var/www/AI_Telegram_bot/database.db
 
 
 volumes:
