@@ -71,7 +71,7 @@ def main() -> None:
         dispatcher=dp,
         bot=bot,
     )
-    webhook_requests_handler.register(app, path='')
+    webhook_requests_handler.register(app, path=f'/{TELEGRAM_TOKEN}/')
     setup_application(app, dp, bot=bot)
 
     logging.info(f'Приложение запущено')
