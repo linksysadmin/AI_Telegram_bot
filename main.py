@@ -11,7 +11,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-from config import TELEGRAM_TOKEN, BASE_WEBHOOK_URL, WEBHOOK_PATH, WEB_SERVER_HOST, WEB_SERVER_PORT, DEBUG, REDIS_URL
+from config import TELEGRAM_TOKEN, WEBHOOK_URL, WEB_SERVER_HOST, WEB_SERVER_PORT, DEBUG, REDIS_URL
 from app.routers import router as main_router
 from tasks import launching_the_daily_generation_reset_task
 
@@ -48,12 +48,7 @@ COMMANDS = [
 
 async def on_startup(bot: Bot) -> None:
     await bot.set_my_commands(COMMANDS)
-    await bot.set_webhook(
-        f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
-    )
-    # await bot.set_webhook(
-    #     f"{BASE_WEBHOOK_URL}/",
-    # )
+    await bot.set_webhook(WEBHOOK_URL)
     logging.warning(f'Вебхук задан: {await bot.get_webhook_info()}')
 
 
@@ -76,7 +71,7 @@ def main() -> None:
         dispatcher=dp,
         bot=bot,
     )
-    webhook_requests_handler.register(app, path=WEBHOOK_PATH)
+    webhook_requests_handler.register(app, path='')
     setup_application(app, dp, bot=bot)
 
     logging.info(f'Приложение запущено')
